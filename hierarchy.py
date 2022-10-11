@@ -6,31 +6,10 @@ import datetime
 import json
 
 from pathlib import Path
-import os
-
-import sys
-# ==== Files Functions  ====
-
-def check_path_exists_is_file(file_path):
-    """
-    Checks if the path given as argument is a file.
-    If so, returns the a Path object
-    else returns False
-    """
-
-    if not isinstance(file_path,Path):
-        file_path = Path(file_path)
-
-    if file_path.exists():
-        if file_path.is_file():
-            return (file_path)
-        else:
-            return (False)
-    else:
-        return(False)
-
+import os,sys,stat
 
 # ==== Active Directory Functions ====
+
 def get_item_from_AD(ip,user,pwd,dc,ldap_query,attributes=["cn"]):
     """
     Performs a LDAP query on a server
@@ -153,4 +132,82 @@ def create_AD_json(ip,user,pwd,dc,ldap_query,json_path,root_group_name):
 
     json_file.close()
     
+    return(sAMAccountName_json)
+
+# ==== Create Directory functions ====
+
+def create_directory_hierarchy(output_folder,json_data):
+    """
+    given a json in the form of 
+
+    {
+    "root_group": [
+        {
+            "group_1": [
+                {
+                    "user1": uid
+                }
+            }
+        ]
+    }
+
+    produces a folder hierarchy in "ouptut_folder" in the form:
+
+    group1
+        user1 (permissions 750 user1:user1)
+        group1 (pemissions 750 group1:group1)
+    """
+    output_folder = Path(output_folder)
+    # get the list of element
+    root_group = list(json_data.keys())[0]
+
+    for group in json_data[root_group]:
+        group_name = list(group.keys())[0]
+        group_folder = Path(os.path.join(output_folder.as_posix(),
+                group_name))
+
+        os.makedirs(group_folder,mode=0o750,exist_ok = True)
+        os.chmod(group_folder,stat.S_ISGID)
+        os.chmod(group_folder,0o4750)
+
+
+        group_folder = Path(os.path.join(group_folder.as_posix(),
+                group_name))
+
+        os.makedirs(group_folder,mode=0o750,exist_ok = True)
+        os.chmod(group_folder,0o750)
+
+
+        for user in group[group_name]:
+
+            user_folder = os.path.join(output_folder,
+                group_name,
+                list(user.keys())[0]) 
+
+            os.makedirs(user_folder,mode=0o740,exist_ok = True)
+            os.chmod(user_folder,0o700)
+
     return(None)
+
+# ==== Files Functions  ====
+
+def check_path_exists_is_file(file_path):
+    """
+    Checks if the path given as argument is a file.
+    If so, returns the a Path object
+    else returns False
+    """
+
+    if not isinstance(file_path,Path):
+        file_path = Path(file_path)
+
+    if file_path.exists():
+        if file_path.is_file():
+            return (file_path)
+        else:
+            return (False)
+    else:
+        return(False)
+
+
+
