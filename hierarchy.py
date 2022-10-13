@@ -136,7 +136,7 @@ def create_AD_json(ip,user,pwd,dc,ldap_query,json_path,root_group_name):
 
 # ==== Create Directory functions ====
 
-def create_directory_hierarchy(output_folder,json_data):
+def create_directory_hierarchy(output_folder,json_data,users_dir=False):
     """
     given a json in the form of 
 
@@ -156,6 +156,9 @@ def create_directory_hierarchy(output_folder,json_data):
     group1
         user1 (permissions 750 user1:user1)
         group1 (pemissions 750 group1:group1)
+
+    if users_dir is False, produces only the directory relative to the group
+    in the first level
     """
     output_folder = Path(output_folder)
     # get the list of element
@@ -170,22 +173,22 @@ def create_directory_hierarchy(output_folder,json_data):
         os.chmod(group_folder,stat.S_ISGID)
         os.chmod(group_folder,0o4750)
 
-
         group_folder = Path(os.path.join(group_folder.as_posix(),
                 group_name))
+ 
+        if users_dir:
+            os.makedirs(group_folder,mode=0o750,exist_ok = True)
+            os.chmod(group_folder,0o750)
 
-        os.makedirs(group_folder,mode=0o750,exist_ok = True)
-        os.chmod(group_folder,0o750)
 
+            for user in group[group_name]:
 
-        for user in group[group_name]:
+                user_folder = os.path.join(output_folder,
+                    group_name,
+                    list(user.keys())[0]) 
 
-            user_folder = os.path.join(output_folder,
-                group_name,
-                list(user.keys())[0]) 
-
-            os.makedirs(user_folder,mode=0o740,exist_ok = True)
-            os.chmod(user_folder,0o700)
+                os.makedirs(user_folder,mode=0o740,exist_ok = True)
+                os.chmod(user_folder,0o700)
 
     return(None)
 
@@ -209,5 +212,24 @@ def check_path_exists_is_file(file_path):
     else:
         return(False)
 
+def read_paramenters_json(json_file):
+    """
+    given a json containing:
+    {
+        ip/FQDN: of the LDAP server
+        user: user for the binding
+        pwd: password of the binfing
+        dc: domain controller 
+    }
+    parse its contents to run the script
+    """
 
+    json_file = Path(json_file)
 
+    try:
+        with open(json_file, "r") as jf:
+        json_data = json.load(jf)
+    except:
+        sys.exit("The file {} could not be parsed".format(json_file.as_posix())
+
+    return(json_data) 
