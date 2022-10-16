@@ -92,10 +92,15 @@ def create_AD_json(ip,user,pwd,dc,ldap_query,json_path,root_group_name):
                 ["sAMAccountName"])
         group_dict = {str(group.sAMAccountName): []}
         for element in user_list:
-            uid = getpwnam(str(element.sAMAccountName))[2]
-            user_dict = { str(element.sAMAccountName): uid }
+            uid = getpwnam(str(element.samaccountname))[2]
+            gid = getpwnam("lg."+str(element.samaccountname))[3]
+            user_dict = { str(element.sAMAccountName): {} }
+
+            user_dict[str(element.sAMAccountName)]["uid"] = uid
+            user_dict[str(element.sAMAccountName)]["gid"] = gid
             group_dict[str(group.sAMAccountName)].append(user_dict)
-    
+   
+        print(group_dict) 
         sAMAccountName_list.append(group_dict)
     
     sAMAccountName_json = { root_group_name : sAMAccountName_list}
@@ -153,13 +158,17 @@ def create_directory_hierarchy(output_folder,json_data,users_dir=False):
 
     produces a folder hierarchy in "ouptut_folder" in the form:
 
-    group1
-        user1 (permissions 750 user1:user1)
-        group1 (pemissions 750 group1:group1)
+    group1 (permissions 750 g+s hpc.admin:group1)
+        user1 (permissions 700 user1:user1)
+        group1 (pemissions 750 hpc.admin:group1)
 
     if users_dir is False, produces only the directory relative to the group
     in the first level
     """
+
+    hpc_admin_uid = getpwnam("hpc.admin")[2]
+    lg_hpc_admin_gid = getpwnam("lg.hpc.admin")[3]
+
     output_folder = Path(output_folder)
     # get the list of element
     root_group = list(json_data.keys())[0]
@@ -169,26 +178,34 @@ def create_directory_hierarchy(output_folder,json_data,users_dir=False):
         group_folder = Path(os.path.join(output_folder.as_posix(),
                 group_name))
 
-        os.makedirs(group_folder,mode=0o750,exist_ok = True)
+        os.makedirs(group_folder,mode=0o750,exist_ok = True) 
         os.chmod(group_folder,stat.S_ISGID)
         os.chmod(group_folder,0o4750)
+        group_gid = getpwnam(group_name)[3] 
+        os.chown(group_folder, hpc_admin_uid, group_gid)        
+        
+        if users_dir and group[group_name]:
 
-        group_folder = Path(os.path.join(group_folder.as_posix(),
+            group_folder = Path(os.path.join(group_folder.as_posix(),
                 group_name))
  
-        if users_dir:
             os.makedirs(group_folder,mode=0o750,exist_ok = True)
             os.chmod(group_folder,0o750)
+            os.chown(group_folder, hpc_admin_uid, group_gid)        
 
-
-            for user in group[group_name]:
-
+            for user_dict in group[group_name]:
+                user_name=list(user_dict.keys())[0]
+                print(user_dict[user_name])
+                user_uid = user_dict[user_name]["uid"]
+                user_gid = user_dict[user_name]["gid"]
                 user_folder = os.path.join(output_folder,
                     group_name,
-                    list(user.keys())[0]) 
+                    user_name) 
 
                 os.makedirs(user_folder,mode=0o740,exist_ok = True)
                 os.chmod(user_folder,0o700)
+
+                os.chown(user_folder, user_uid, user_gid)        
 
     return(None)
 
@@ -228,8 +245,9 @@ def read_paramenters_json(json_file):
 
     try:
         with open(json_file, "r") as jf:
-        json_data = json.load(jf)
+            json_data = json.load(jf)
     except:
-        sys.exit("The file {} could not be parsed".format(json_file.as_posix())
+        sys.exit("The file {} could not be parsed".format(json_file.as_posix()))
+
 
     return(json_data) 
