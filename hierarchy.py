@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 import os,sys,stat
 
+import subprocess
+
 # ==== Active Directory Functions ====
 
 def get_item_from_AD(ip,user,pwd,dc,ldap_query,attributes=["cn"]):
@@ -166,6 +168,7 @@ def create_directory_hierarchy(output_folder,json_data,users_dir=False):
     in the first level
     """
 
+    # vvvv hardcodes!
     hpc_admin_uid = getpwnam("hpc.admin")[2]
     lg_hpc_admin_gid = getpwnam("lg.hpc.admin")[3]
 
@@ -250,4 +253,50 @@ def read_paramenters_json(json_file):
         sys.exit("The file {} could not be parsed".format(json_file.as_posix()))
 
 
-    return(json_data) 
+    return(json_data)
+
+# ==== slurm functions ====
+
+def slurm_user_default_account(username,account,cluster):
+    """
+    Given a username, checks if the user itself has a default bank account.
+
+    If the user presents a default account (any default account) return False
+    else assign it to the account passed as argument
+
+    Arguments:
+
+    username: the name of the user to be considered
+
+    account: the name of the account to be used as default account.
+
+    cluster: name of the slurm cluster to be used
+    """
+
+    sacctmgr_list = ["sacctmgr",
+        "-n",
+        "show",
+        "user",
+        username,
+        "format=defaultaccount%40"]
+
+    def_account=subprocess.run(sacctmgr_list,stdout=subprocess.PIPE)
+
+    def_account=def_account.stdout.decode("UTF-8").strip(" ").rstrip()
+
+    if def_account:
+        return(False)
+    else:
+
+        sacctmgr_list = ["sacctmgr",
+            "quiet",
+            "create",
+            "user",
+            "name={}".format(username),
+            "cluster={}".format(cluster),
+            "account={}".format(account)]
+    
+    
+        def_account=subprocess.run(sacctmgr_list,stdout=subprocess.PIPE)
+        return(account)
+
