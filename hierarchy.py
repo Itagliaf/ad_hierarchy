@@ -287,16 +287,93 @@ def slurm_user_default_account(username,account,cluster):
     if def_account:
         return(False)
     else:
+        if slurm_check_account(account,cluster):
+            sacctmgr_list = ["sacctmgr",
+                "quiet",
+                "create",
+                "user",
+                "name={}".format(username),
+                "cluster={}".format(cluster),
+                "account={}".format(account)]
+        
+        
+            def_account=subprocess.run(sacctmgr_list,stdout=subprocess.PIPE)
+            return(account)
+        else:
+            sys.exit("Account {} does not exists".format(account))
 
-        sacctmgr_list = ["sacctmgr",
-            "quiet",
-            "create",
-            "user",
-            "name={}".format(username),
-            "cluster={}".format(cluster),
-            "account={}".format(account)]
+def slurm_user_account(username,account,cluster):
+    """
+    Given a username, checks if the user itself has an association
+    with a certain bank account: If so exits with False, else creates an
+    association with username - account.
+
+    Arguments:
+
+    username: the name of the user to be considered
+
+    account: the name of the account to be used as default account.
+
+    cluster: name of the slurm cluster to be used
+    """
+
+    sacctmgr_list = ["sacctmgr",
+        "-n",
+        "list",
+        "association",
+        "where",
+        "user={}".username(username),
+        "format=account%40"]
+
+    account_list=subprocess.run(sacctmgr_list,stdout=subprocess.PIPE)
+
+    account_list=account.stdout.decode("UTF-8")
+
+    account_list = [ group.strip(" ") for group 
+                       in account_list.split("\n") 
+                       if group ]
     
-    
-        def_account=subprocess.run(sacctmgr_list,stdout=subprocess.PIPE)
+    if account in account_list:
+        return(False)
+
+    else:
+        if slurm_check_account:
+            sacctmgr_list = [ "sacctmgr",
+                "quite",
+                "create",
+                "user",
+                "name={}".format(username),
+                "cluster={}".format(cluster),
+                "account={}".format(account)
+                ]
+       
+            account_list=subprocess.run(sacctmgr_list,stdout=subprocess.PIPE)
+
+        else:
+            sys.exit("Account {} does not exists".format(account))
+
         return(account)
+
+def slurm_check_account(account,cluster):
+    """
+    Checks if an account is defined in a slurm cluster
+    """
+
+    sacctmgr_list = ["sacctmgr",
+        "-n",
+        "list",
+        "accounts", 
+        "where",
+        "account={}".format(account),
+        "format=account%30"
+        ]
+
+    account_list=subprocess.run(sacctmgr_list,stdout=subprocess.PIPE)
+
+    if account_list:
+        return(True)
+
+    else:
+        return(False)
+
 
