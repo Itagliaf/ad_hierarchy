@@ -257,6 +257,35 @@ def read_paramenters_json(json_file):
 
 # ==== slurm functions ====
 
+def slurm_create_recoursive_user(json_file, cluster):
+    """
+    given a json in the form of 
+
+    {
+    "root_group": [
+        {
+            "group_1": [
+                {
+                    "user1": uid
+                }
+            }
+        ]
+    }
+
+    adds the users to the appropriate slurm account if needed
+    """
+    root_group = list(json_data.keys())[0]
+
+    for account in json_data[root_group]:
+        account_users = [ list(user_dict.keys())[0] for 
+           user_dict in account[group_name] ]
+        
+        for account in account_users:
+            slurm_user_account(username,account,cluster)   
+            slurm_user_default_account(username,account,cluster)
+
+    return None
+
 def slurm_user_default_account(username,account,cluster):
     """
     Given a username, checks if the user itself has a default bank account.
